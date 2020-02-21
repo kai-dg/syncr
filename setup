@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+if ! grep -q "syncr" ~/.bashrc
+then
+    echo "alias syncr='python3 $(pwd)/run.py'" >> ~/.bashrc
+    echo "> Syncr: alias for Syncr has been added to bashrc"
+    source ~/.bashrc
+else
+    echo "> Syncr: alias already exists in bashrc"
+fi
