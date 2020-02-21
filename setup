@@ -17,7 +17,7 @@ case $(uname | tr '[:upper:]' '[:lower:]') in
         echo "> Syncr: alias for Syncr has been added to bashrc"
         source ~/.bash_profile
     else
-        echo "> Syncr: alias already exists in bashrc"
+        echo "> Syncr: alias already exists in bash_profile"
     fi
     ;;
   msys*)

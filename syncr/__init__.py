@@ -30,6 +30,8 @@ def read_token():
 
 class Syncr(DbxManager):
     def __init__(self, args):
+        self.dbxpath = db.read(s.DBXPATH)
+        self.syncadd = db.read(s.ADDPATH)
         self.dm = DbxManager
         self.commands = {
             "test": self.test,
@@ -44,8 +46,6 @@ class Syncr(DbxManager):
             "pull": self.pull,
             "status": self.status
         }
-        self.dbxpath = db.read(s.DBXPATH)
-        self.syncadd = db.read(s.ADDPATH)
         self.run_args(args)
 
     def run_args(self, args):

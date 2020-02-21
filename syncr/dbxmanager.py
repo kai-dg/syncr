@@ -3,9 +3,26 @@ import os
 import json
 import dropbox
 import zipfile
-from pathlib import Path
+import shutil
 OVERWRITE = dropbox.files.WriteMode.overwrite
 
+
+def unzipper(data, dest):
+    zipf = os.path.join(dest, "temp.zip")
+    with open(zipf, "wb+") as f:
+        f.write(data)
+    with zipfile.ZipFile(zipf, 'r') as z:
+        files = [f.filename for f in z.filelist]
+        # Safe extract with dest
+        for f in files[1:]:
+            z.extract(f, dest)
+        src = os.path.join(dest, files[0].replace("/", ""))
+        files = os.listdir(src)
+        for f in files:
+            shutil.move(os.path.join(src, f), dest)
+    os.rmdir(src)
+    os.remove(zipf)
+    return True
 
 class DbxManager:
     def __init__(self, token):
@@ -62,10 +79,5 @@ class DbxManager:
     def download(self, folder, dest):
         check = self.dbx.files_download_zip(folder)
         zipbytes = check[-1].content
-        folder = os.path.join(dest, "temp.zip")
-        with open(folder, "wb") as f:
-            f.write(zipbytes)
-        with zipfile.ZipFile(folder, 'r') as zip_ref:
-            p = Path(dest)
-            zip_ref.extractall(p.parent)
-        os.remove(folder)
+        zipping = unzipper(zipbytes, dest)
+        print(f"> Syncr: Downloaded all from dropbox {folder}")
