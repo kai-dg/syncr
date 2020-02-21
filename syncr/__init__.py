@@ -1,68 +1,125 @@
 #!/usr/bin/env python3
-import dropbox
 import os
-import json
+from cryptography.fernet import Fernet
 from os.path import getmtime
-CWDPATH = os.getcwd()
-ABSPATH = os.path.dirname(os.path.realpath(__file__))
-DATAFOLDER = os.path.join(ABSPATH, ".syncdata")
-ADD_DATA = os.path.join(DATAFOLDER, ".syncadd.json")
-"""
-try:
-    with open(ADD_DATA, "r") as f:
-        SYNCADD = json.load(f)
-except FileNotFoundError:
-    os.mkdir(DATAFOLDER) if not os.path.exists(DATAFOLDER)
-    with open(ADD_DATA, "w") as f:
-        f.write("{}")
-        SYNCADD = {}
-"""
+from .dbxmanager import DbxManager
+from . import settings as s
+from . import database as db
 
-def detect_change(f, mod, size):
-    if SYNCADD[f]["mod"] != mod or SYNCADD[f]["size"] != size:
-        print(f"> Syncr: added {f}")
-        return {"mod": mod, "size": size}
-    print(f"> No changes detected for {f}")
-    return None
 
-class Syncr:
-    def __init__(self):
-        self.dbx = dropbox.Dropbox("")
+def read_token():
+    if os.path.exists(s.TOKENPATH):
+        with open(s.TOKENPATH, "r") as f:
+            tokens = f.read().split()
+            try:
+                f = Fernet(str.encode(tokens[0]))
+                return f.decrypt(str.encode(tokens[1])).decode()
+            except Exception as e:
+                print(f"> Syncr: Credentials Error => {e.__class__}")
+                return print(e)
+    else:
+        token = input("> Syncer: What is your token?\n")
+        key = Fernet.generate_key()
+        f = Fernet(key)
+        enc = f.encrypt(str.encode(token.strip())).decode()
+        with open(s.TOKENPATH, "w") as f:
+            data = key.decode().strip() + " " + enc
+            f.write(data)
+            print("> Syncr: Token has been saved")
+        return token.strip()
 
-    def init(self):
-        if not os.path.exists(ADD_DATA):
-            if not os.path.exists(DATAFOLDER):
-                os.mkdir(DATAFOLDER)
-            with open(ADD_DATA, "w") as f:
-                f.write("{}")
-                SYNCADD = {}
+class Syncr(DbxManager):
+    def __init__(self, args):
+        self.dm = DbxManager
+        self.commands = {
+            "test": self.test,
+            "init": self.init,
+            "add": self.add,
+            "rm": self.remove,
+            "pull": self.pull,
+            "dbxcreate": self.dm(read_token()).create,
+            "dbxdelete": self.dm(read_token()).delete
+        }
+        self.single_commands = {
+            "push": self.push,
+            "status": self.status
+        }
+        self.dbxpath = db.read(s.DBXPATH)
+        self.syncadd = db.read(s.ADDPATH)
+        self.run_args(args)
+
+    def run_args(self, args):
+        if len(args) == 0:
+            return print("> Syncr: give me a command")
+        if args[0] not in list(self.commands) and args[0] \
+                   not in list(self.single_commands):
+            return print(f"> Syncr: {args[0]} is not a command")
+        try:
+            self.single_commands[args[0]]()
+        except:
+            if len(args) < 2:
+                return print(f"Syncr: {args[0]} needs an argument")
+            self.commands[args[0]](args[1:])
+
+    def test(self, args):
+        self.dm = self.dm(read_token())
+        self.dm.check_folder(self.syncadd["folder"])
+
+    def init(self, args):
+        self.dm = self.dm(read_token())
+        if len(args) < 1:
+            return print(f"> Syncr: Need to init a folder name from your dropbox")
+        folder = ("/" + args[0]) if args[0][0] != "/" else args[0]
+        if not os.path.exists(s.DBXPATH):
+            if not os.path.exists(s.DATAFOLDER):
+                os.mkdir(s.DATAFOLDER)
+            syncadd = {"folder": folder}
+            db.write(s.DBXPATH, syncadd, writemode="w")
+            db.write(s.ADDPATH, {}, writemode="w")
+            print(f"> Syncr: initialized dropbox folder {folder}")
         else:
-            print(f"> Syncr: this folder already has init")
+            print(f"> Syncr: this folder already has an init")
 
-    def write(self, data):
-        with open(ADD_DATA, "w+") as f:
-            json.dump(data, f)
+
+    def push(self):
+        print("> Syncr: Reminder, currently can only push files under 5MB")
+        self.dm = self.dm(read_token())
+        folder = self.dbxpath["folder"]
+        for f in self.syncadd:
+            if self.syncadd[f]["pushed"] == False:
+                self.dm.upload(folder, f)
+                self.syncadd[f]["pushed"] == True
+        return print("> Syncr: Pushed")
+
+    def add_all(self):
+        for root, dirs, files in os.walk(s.CWDPATH):
+            for f in files:
+                root = root[1:] if root[0] == "." else root
+                root = root[1:] if root[0] == "/" else root
+                path = os.path.join(s.CWDPATH, root, f)
+                print(path)
 
     def add(self, files):
         """files (list): List of args"""
-        data = SYNCADD
+        data = self.syncadd.copy()
+        if self.dbxpath == {}:
+            return print("> Syncr: Run syncr init to initialize this folder")
         for f in files:
-            fpath = os.path.join(CWDPATH, f)
+            fpath = os.path.join(s.CWDPATH, f)
             if os.path.exists(fpath):
+                data[f] = {} if not data.get(f, None) else data[f]
                 mod = getmtime(fpath)
                 size = os.path.getsize(fpath)
-                if data.get(f, None):
-                    check = detect_change(f, mod, size)
-                    if not check:
-                        pass
-                    else:
-                        data[f] = check
-                else:
-                    data[f] = {"mod": mod, "size": size}
-        if data != SYNCADD:
-            write(data)
+                # Need better modification detection
+                if data[f].get("size", None) != size:
+                    data[f]["mod"] = mod
+                    data[f]["pushed"] = False
+                    print(f"> Syncr: {f} is queued to push")
+                data[f]["size"] = size
+        if data != self.syncadd:
+            db.write(s.ADDPATH, data)
         else:
-            print("> No changes detected at all")
+            print("> Syncr: No changes detected at all")
 
     def remove(self, files):
         pass
@@ -70,6 +127,7 @@ class Syncr:
     def status(self):
         pass
 
-    def pull(self):
+    def pull(self, args):
+        self.dm = self.dm(read_token())
         for entry in self.dbx.files_list_folder('/development').entries:
             print(entry.name)
