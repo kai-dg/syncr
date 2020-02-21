@@ -36,12 +36,12 @@ class Syncr(DbxManager):
             "init": self.init,
             "add": self.add,
             "rm": self.remove,
-            "pull": self.pull,
             "dbxcreate": self.dm(read_token()).create,
             "dbxdelete": self.dm(read_token()).delete
         }
         self.single_commands = {
             "push": self.push,
+            "pull": self.pull,
             "status": self.status
         }
         self.dbxpath = db.read(s.DBXPATH)
@@ -63,13 +63,17 @@ class Syncr(DbxManager):
 
     def test(self, args):
         self.dm = self.dm(read_token())
-        self.dm.check_folder(self.syncadd["folder"])
+        print(self.dm.check_for_folder(args[0]))
 
     def init(self, args):
         self.dm = self.dm(read_token())
         if len(args) < 1:
             return print(f"> Syncr: Need to init a folder name from your dropbox")
         folder = ("/" + args[0]) if args[0][0] != "/" else args[0]
+        folder_exists = self.dm.check_for_folder(folder)
+        if not folder_exists:
+            print(f"> Syncr: Folder {folder} could not be found dropbox")
+            return print("> Syncr: Create it with the dbxcreate command")
         if not os.path.exists(s.DBXPATH):
             if not os.path.exists(s.DATAFOLDER):
                 os.mkdir(s.DATAFOLDER)
@@ -85,11 +89,17 @@ class Syncr(DbxManager):
         print("> Syncr: Reminder, currently can only push files under 5MB")
         self.dm = self.dm(read_token())
         folder = self.dbxpath["folder"]
+        pushed = False
         for f in self.syncadd:
             if self.syncadd[f]["pushed"] == False:
-                self.dm.upload(folder, f)
-                self.syncadd[f]["pushed"] == True
-        return print("> Syncr: Pushed")
+                self.dm.upload(folder, f, self.syncadd[f]["path"])
+                self.syncadd[f]["pushed"] = True
+                pushed = True
+        db.write(s.ADDPATH, self.syncadd)
+        if pushed:
+            return print("> Syncr: Finished pushing")
+        else:
+            return print("> Syncr: Nothing is queued to push")
 
     def add_all(self):
         for root, dirs, files in os.walk(s.CWDPATH):
@@ -110,6 +120,7 @@ class Syncr(DbxManager):
                 data[f] = {} if not data.get(f, None) else data[f]
                 mod = getmtime(fpath)
                 size = os.path.getsize(fpath)
+                data[f]["path"] = f
                 # Need better modification detection
                 if data[f].get("size", None) != size:
                     data[f]["mod"] = mod
@@ -121,13 +132,14 @@ class Syncr(DbxManager):
         else:
             print("> Syncr: No changes detected at all")
 
+    def pull(self):
+        self.dm = self.dm(read_token())
+        folder = self.dbxpath["folder"]
+        self.dm.download(folder, s.CWDPATH)
+        return print(f"> Syncr: Updated this folder from dropbox {folder}")
+
     def remove(self, files):
         pass
 
     def status(self):
         pass
-
-    def pull(self, args):
-        self.dm = self.dm(read_token())
-        for entry in self.dbx.files_list_folder('/development').entries:
-            print(entry.name)
