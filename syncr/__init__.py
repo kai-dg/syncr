@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import os
+import copy
 from cryptography.fernet import Fernet
 from os.path import getmtime
 from .dbxmanager import DbxManager
@@ -8,7 +9,7 @@ from . import database as db
 
 
 def read_token():
-    if os.path.exists(s.TOKENPATH):
+    try:
         with open(s.TOKENPATH, "r") as f:
             tokens = f.read().split()
             try:
@@ -17,7 +18,7 @@ def read_token():
             except Exception as e:
                 print(f"> Syncr: Credentials Error => {e.__class__}")
                 return print(e)
-    else:
+    except FileNotFoundError:
         token = input("> Syncer: What is your token?\n")
         key = Fernet.generate_key()
         f = Fernet(key)
@@ -32,9 +33,10 @@ class Syncr(DbxManager):
     def __init__(self, args):
         self.dbxpath = db.read(s.DBXPATH)
         self.syncadd = db.read(s.ADDPATH)
+        self.compare = copy.deepcopy(self.syncadd)
+        self.ignore = db.read(s.IGNOREPATH, "text").split()
         self.dm = DbxManager
         self.commands = {
-            "test": self.test,
             "init": self.init,
             "add": self.add,
             "rm": self.remove,
@@ -42,6 +44,7 @@ class Syncr(DbxManager):
             "dbxdelete": self.dm(read_token()).delete
         }
         self.single_commands = {
+            "ignore": self.ignorer,
             "push": self.push,
             "pull": self.pull,
             "status": self.status
@@ -56,14 +59,16 @@ class Syncr(DbxManager):
             return print(f"> Syncr: {args[0]} is not a command")
         try:
             self.single_commands[args[0]]()
-        except:
+        except Exception as e:
             if len(args) < 2:
+                print(f"> Syncr: ERROR => {str(e)}")
                 return print(f"Syncr: {args[0]} needs an argument")
             self.commands[args[0]](args[1:])
 
-    def test(self, args):
-        self.dm = self.dm(read_token())
-        print(self.dm.check_for_folder(args[0]))
+    def ignorer(self):
+        for i in self.ignore:
+            f = i[1:] if i[0] == os.sep else i
+            ignore = os.path.join(s.CWDPATH, f)
 
     def init(self, args):
         self.dm = self.dm(read_token())
@@ -84,7 +89,6 @@ class Syncr(DbxManager):
         else:
             print(f"> Syncr: this folder already has an init")
 
-
     def push(self):
         print("> Syncr: Reminder, currently can only push files under 5MB")
         self.dm = self.dm(read_token())
@@ -92,7 +96,7 @@ class Syncr(DbxManager):
         pushed = False
         for f in self.syncadd:
             if self.syncadd[f]["pushed"] == False:
-                self.dm.upload(folder, f, self.syncadd[f]["path"])
+                self.dm.upload(folder, f)
                 self.syncadd[f]["pushed"] = True
                 pushed = True
         db.write(s.ADDPATH, self.syncadd)
@@ -101,34 +105,43 @@ class Syncr(DbxManager):
         else:
             return print("> Syncr: Nothing is queued to push")
 
+    def add_single(self, f):
+        fpath = os.path.join(s.CWDPATH, f)
+        if os.path.exists(fpath):
+            self.compare[f] = {} if not self.compare.get(f, None) \
+                              else self.compare[f]
+            mod = getmtime(fpath)
+            size = os.path.getsize(fpath)
+            # Need better modification detection
+            if self.compare[f].get("size", None) != size:
+                self.compare[f]["mod"] = mod
+                self.compare[f]["pushed"] = False
+                print(f"> Syncr: {f} is queued to push")
+            self.compare[f]["size"] = size
+    
     def add_all(self):
-        for root, dirs, files in os.walk(s.CWDPATH):
+        for root, dirs, files in os.walk(s.CWDPATH, topdown=False):
             for f in files:
-                root = root[1:] if root[0] == "." else root
-                root = root[1:] if root[0] == "/" else root
                 path = os.path.join(s.CWDPATH, root, f)
-                print(path)
+                if "syncr" not in path:
+                    subdirs = root.replace(s.CWDPATH, "")
+                    if subdirs != "":
+                        subdirs = subdirs[1:] if subdirs[0] == "/" else subdirs
+                        self.add_single(os.path.join(subdirs, f))
+                    else:
+                        self.add_single(f)
 
     def add(self, files):
         """files (list): List of args"""
-        data = self.syncadd.copy()
         if self.dbxpath == {}:
             return print("> Syncr: Run syncr init to initialize this folder")
-        for f in files:
-            fpath = os.path.join(s.CWDPATH, f)
-            if os.path.exists(fpath):
-                data[f] = {} if not data.get(f, None) else data[f]
-                mod = getmtime(fpath)
-                size = os.path.getsize(fpath)
-                data[f]["path"] = f
-                # Need better modification detection
-                if data[f].get("size", None) != size:
-                    data[f]["mod"] = mod
-                    data[f]["pushed"] = False
-                    print(f"> Syncr: {f} is queued to push")
-                data[f]["size"] = size
-        if data != self.syncadd:
-            db.write(s.ADDPATH, data)
+        if files[0] == ".":
+            self.add_all()
+        else:
+            for f in files:
+                self.add_single(f)
+        if self.compare != self.syncadd:
+            db.write(s.ADDPATH, self.compare)
         else:
             print("> Syncr: No changes detected at all")
 
@@ -136,7 +149,6 @@ class Syncr(DbxManager):
         self.dm = self.dm(read_token())
         folder = self.dbxpath["folder"]
         self.dm.download(folder, s.CWDPATH)
-        return print(f"> Syncr: Updated this folder from dropbox {folder}")
 
     def remove(self, files):
         pass

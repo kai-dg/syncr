@@ -56,7 +56,7 @@ class DbxManager:
         folder = ("/" + args[0]) if args[0][0] != "/" else args[0]
         try:
             confirm = input(f"Are you sure you want to delete {folder}" +
-                             "from dropbox?")
+                             " from dropbox? (y/n)\n")
             if confirm == "y":
                 meta = self.dbx.files_delete(folder)
                 print(f"> Syncr: Deleted {folder} in dropbox")
@@ -67,17 +67,23 @@ class DbxManager:
                 return print(f"> Syncr: {folder} does not exist in dropbox")
             return print(f"> Syncr: ERROR => {str(e)}")
 
-    def upload(self, folder, f, path):
+    def upload(self, folder, f):
         try:
             with open(f, "rb") as b:
-                dbxpath = folder + "/" + path if path[0] != "/" else folder + path
+                dbxpath = folder + "/" + f if f[0] != "/" else folder + f
                 self.dbx.files_upload(b.read(), dbxpath, OVERWRITE, mute=True)
                 print(f"> Syncr: Uploaded {f} to Dropbox => {folder}")
         except Exception as e:
             return print(f"> Syncr: ERROR => {str(e)}")
 
     def download(self, folder, dest):
-        check = self.dbx.files_download_zip(folder)
+        try:
+            check = self.dbx.files_download_zip(folder)
+        except Exception as e:
+            if "LookupError" in str(e):
+                return print(f"> Syncr: Could not find {folder} in dropbox")
+            else:
+                return print(f"> Syncr: ERROR => {str(e)}")
         zipbytes = check[-1].content
         zipping = unzipper(zipbytes, dest)
-        print(f"> Syncr: Downloaded all from dropbox {folder}")
+        return print(f"> Syncr: Updated this folder from dropbox {folder}")
