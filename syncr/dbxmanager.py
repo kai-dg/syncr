@@ -36,54 +36,54 @@ class DbxManager:
                         return True
             return False
         except Exception as e:
-            return print(f"> Syncr: ERROR => {str(e)}")
+            return print(f"{s.PREFIX} ERROR => {str(e)}")
 
     def create(self, args):
         if args == []:
-            return print("> Syncr: Need a folder name to create in dropbox")
+            return print("{s.PREFIX} Need a folder name to create in dropbox")
         folder = ("/" + args[0]) if args[0][0] != "/" else args[0]
         try:
             meta = self.dbx.files_create_folder(folder)
-            print(f"> Syncr: Created {folder} in dropbox")
+            print(f"{s.PREFIX} Created {folder} in dropbox")
         except Exception as e:
             if "WriteConflictError" in str(e):
-                return print(f"> Syncr: {folder} already exists in dropbox")
-            return print(f"> Syncr: ERROR => {str(e)}")
+                return print(f"{s.PREFIX} {folder} already exists in dropbox")
+            return print(f"{s.PREFIX} ERROR => {str(e)}")
 
     def delete(self, args):
         if args == []:
-            return print("> Syncr: Need a folder name to delete in dropbox")
+            return print("{s.PREFIX} Need a folder name to delete in dropbox")
         folder = ("/" + args[0]) if args[0][0] != "/" else args[0]
         try:
-            confirm = input(f"Are you sure you want to delete {folder}" +
-                             " from dropbox? (y/n)\n")
+            confirm = input(f"{s.PREFIX} Are you sure you want to delete" +
+                            f" {folder} from dropbox? (y/n)\n")
             if confirm == "y":
                 meta = self.dbx.files_delete(folder)
-                print(f"> Syncr: Deleted {folder} in dropbox")
+                print(f"{s.PREFIX} Deleted {folder} in dropbox")
             else:
-                return print(f"> Syncr: Canceled deletion of {folder}")
+                return print(f"{s.PREFIX} Canceled deletion of {folder}")
         except Exception as e:
             if "LookupError" in str(e):
-                return print(f"> Syncr: {folder} does not exist in dropbox")
-            return print(f"> Syncr: ERROR => {str(e)}")
+                return print(f"{s.PREFIX} {folder} does not exist in dropbox")
+            return print(f"{s.PREFIX} ERROR => {str(e)}")
 
     def upload(self, folder, f):
         try:
             with open(f, "rb") as b:
                 dbxpath = folder + "/" + f if f[0] != "/" else folder + f
                 self.dbx.files_upload(b.read(), dbxpath, OVERWRITE, mute=True)
-                print(f"> Syncr: Uploaded {f} to Dropbox => {folder}")
+                print(f"{s.PREFIX} Uploaded {f} to Dropbox => {folder}")
         except Exception as e:
-            return print(f"> Syncr: ERROR => {str(e)}")
+            return print(f"{s.PREFIX} ERROR => {str(e)}")
 
     def download(self, folder, dest):
         try:
             check = self.dbx.files_download_zip(folder)
         except Exception as e:
             if "LookupError" in str(e):
-                return print(f"> Syncr: Could not find {folder} in dropbox")
+                return print(f"{s.PREFIX} Could not find {folder} in dropbox")
             else:
-                return print(f"> Syncr: ERROR => {str(e)}")
+                return print(f"{s.PREFIX} ERROR => {str(e)}")
         zipbytes = check[-1].content
         zipping = unzipper(zipbytes, dest)
-        return print(f"> Syncr: Updated this folder from dropbox {folder}")
+        return print(f"{s.PREFIX} Updated this folder from dropbox {folder}")

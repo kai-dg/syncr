@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import os
 import copy
+import glob
 from cryptography.fernet import Fernet
 from os.path import getmtime
 from .dbxmanager import DbxManager
@@ -16,17 +17,17 @@ def read_token():
                 f = Fernet(str.encode(tokens[0]))
                 return f.decrypt(str.encode(tokens[1])).decode()
             except Exception as e:
-                print(f"> Syncr: Credentials Error => {e.__class__}")
+                print(f"{s.PREFIX} Credentials Error => {e.__class__}")
                 return print(e)
     except FileNotFoundError:
-        token = input("> Syncer: What is your token?\n")
+        token = input("{s.PREFIX} What is your token?\n")
         key = Fernet.generate_key()
         f = Fernet(key)
         enc = f.encrypt(str.encode(token.strip())).decode()
         with open(s.TOKENPATH, "w") as f:
             data = key.decode().strip() + " " + enc
             f.write(data)
-            print("> Syncr: Token has been saved")
+            print("{s.PREFIX} Token has been saved")
         return token.strip()
 
 class Syncr(DbxManager):
@@ -53,10 +54,10 @@ class Syncr(DbxManager):
 
     def run_args(self, args):
         if len(args) == 0:
-            return print("> Syncr: give me a command")
+            return print("{s.PREFIX} give me a command")
         if args[0] not in list(self.commands) and args[0] \
                    not in list(self.single_commands):
-            return print(f"> Syncr: {args[0]} is not a command")
+            return print(f"{s.PREFIX} {args[0]} is not a command")
         try:
             self.single_commands[args[0]]()
         except Exception as e:
@@ -66,18 +67,21 @@ class Syncr(DbxManager):
             self.commands[args[0]](args[1:])
 
     def ignorer(self):
+        # Glob for files
+        # Check if directory for /* or */
         for i in self.ignore:
+            print(i)
             f = i[1:] if i[0] == os.sep else i
             ignore = os.path.join(s.CWDPATH, f)
 
     def init(self, args):
         self.dm = self.dm(read_token())
         if len(args) < 1:
-            return print(f"> Syncr: Need to init a folder name from your dropbox")
+            return print(f"{s.PREFIX} Need to init a folder name from your dropbox")
         folder = ("/" + args[0]) if args[0][0] != "/" else args[0]
         folder_exists = self.dm.check_for_folder(folder)
         if not folder_exists:
-            print(f"> Syncr: Folder {folder} could not be found dropbox")
+            print(f"{s.PREFIX} Folder {folder} could not be found dropbox")
             return print("> Syncr: Create it with the dbxcreate command")
         if not os.path.exists(s.DBXPATH):
             if not os.path.exists(s.DATAFOLDER):
@@ -85,12 +89,12 @@ class Syncr(DbxManager):
             syncadd = {"folder": folder}
             db.write(s.DBXPATH, syncadd, writemode="w")
             db.write(s.ADDPATH, {}, writemode="w")
-            print(f"> Syncr: initialized dropbox folder {folder}")
+            print(f"{s.PREFIX} initialized dropbox folder {folder}")
         else:
-            print(f"> Syncr: this folder already has an init")
+            print(f"{s.PREFIX} this folder already has an init")
 
     def push(self):
-        print("> Syncr: Reminder, currently can only push files under 5MB")
+        print("{s.PREFIX} Reminder, currently can only push files under 5MB")
         self.dm = self.dm(read_token())
         folder = self.dbxpath["folder"]
         pushed = False
@@ -101,9 +105,9 @@ class Syncr(DbxManager):
                 pushed = True
         db.write(s.ADDPATH, self.syncadd)
         if pushed:
-            return print("> Syncr: Finished pushing")
+            return print("{s.PREFIX} Finished pushing")
         else:
-            return print("> Syncr: Nothing is queued to push")
+            return print("{s.PREFIX} Nothing is queued to push")
 
     def add_single(self, f):
         fpath = os.path.join(s.CWDPATH, f)
@@ -116,7 +120,7 @@ class Syncr(DbxManager):
             if self.compare[f].get("size", None) != size:
                 self.compare[f]["mod"] = mod
                 self.compare[f]["pushed"] = False
-                print(f"> Syncr: {f} is queued to push")
+                print(f"{s.PREFIX} {f} is queued to push")
             self.compare[f]["size"] = size
     
     def add_all(self):
@@ -134,7 +138,7 @@ class Syncr(DbxManager):
     def add(self, files):
         """files (list): List of args"""
         if self.dbxpath == {}:
-            return print("> Syncr: Run syncr init to initialize this folder")
+            return print("{s.PREFIX} Run syncr init to initialize this folder")
         if files[0] == ".":
             self.add_all()
         else:
@@ -143,7 +147,7 @@ class Syncr(DbxManager):
         if self.compare != self.syncadd:
             db.write(s.ADDPATH, self.compare)
         else:
-            print("> Syncr: No changes detected at all")
+            print("{s.PREFIX} No changes detected at all")
 
     def pull(self):
         self.dm = self.dm(read_token())
@@ -154,4 +158,11 @@ class Syncr(DbxManager):
         pass
 
     def status(self):
-        pass
+        print(f"{s.PREFIX} STATUS {s.Colors.GREEN}{s.CWDPATH}{s.Colors.END}:")
+        notpushed = []
+        for f in self.syncadd:
+            if not self.syncadd[f]["pushed"]:
+                notpushed.append(f)
+        print(f"  > Not pushed:")
+        for p in notpushed:
+            print(f"\t{s.Colors.RED}{p}{s.Colors.END}")
