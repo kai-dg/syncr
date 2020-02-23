@@ -4,6 +4,7 @@ import json
 import dropbox
 import zipfile
 import shutil
+from . import settings as s
 OVERWRITE = dropbox.files.WriteMode.overwrite
 
 
@@ -44,10 +45,12 @@ class DbxManager:
         folder = ("/" + args[0]) if args[0][0] != "/" else args[0]
         try:
             meta = self.dbx.files_create_folder(folder)
-            print(f"{s.PREFIX} Created {folder} in dropbox")
+            print(f"{s.PREFIX} Created {s.GREEN}{folder}" +
+                  f"{s.END} in dropbox")
         except Exception as e:
             if "WriteConflictError" in str(e):
-                return print(f"{s.PREFIX} {folder} already exists in dropbox")
+                return print(f"{s.PREFIX} {s.GREEN}{folder}" +
+                             f"{s.END} already exists in dropbox")
             return print(f"{s.PREFIX} ERROR => {str(e)}")
 
     def delete(self, args):
@@ -56,15 +59,19 @@ class DbxManager:
         folder = ("/" + args[0]) if args[0][0] != "/" else args[0]
         try:
             confirm = input(f"{s.PREFIX} Are you sure you want to delete" +
-                            f" {folder} from dropbox? (y/n)\n")
+                            f" {s.GREEN}{folder}{s.END} " +
+                            "from dropbox? (y/n)\n")
             if confirm == "y":
                 meta = self.dbx.files_delete(folder)
-                print(f"{s.PREFIX} Deleted {folder} in dropbox")
+                print(f"{s.PREFIX} Deleted {s.GREEN}{folder}" +
+                      f"{s.END} in dropbox")
             else:
-                return print(f"{s.PREFIX} Canceled deletion of {folder}")
+                return print(f"{s.PREFIX} Canceled deletion of {s.GREEN}" +
+                             f"{folder}{s.END}")
         except Exception as e:
             if "LookupError" in str(e):
-                return print(f"{s.PREFIX} {folder} does not exist in dropbox")
+                return print(f"{s.PREFIX} {s.GREEN}{folder}{s.END} does " +
+                             "not exist in dropbox")
             return print(f"{s.PREFIX} ERROR => {str(e)}")
 
     def upload(self, folder, f):
@@ -72,7 +79,8 @@ class DbxManager:
             with open(f, "rb") as b:
                 dbxpath = folder + "/" + f if f[0] != "/" else folder + f
                 self.dbx.files_upload(b.read(), dbxpath, OVERWRITE, mute=True)
-                print(f"{s.PREFIX} Uploaded {f} to Dropbox => {folder}")
+                print(f"{s.PREFIX} Uploaded {s.GREEN}{f}" +
+                      f"{s.END} to Dropbox => {folder}")
         except Exception as e:
             return print(f"{s.PREFIX} ERROR => {str(e)}")
 
@@ -81,7 +89,8 @@ class DbxManager:
             check = self.dbx.files_download_zip(folder)
         except Exception as e:
             if "LookupError" in str(e):
-                return print(f"{s.PREFIX} Could not find {folder} in dropbox")
+                return print(f"{s.PREFIX} Could not find {s.GREEN}{folder}" +
+                             f"{s.END} in dropbox")
             else:
                 return print(f"{s.PREFIX} ERROR => {str(e)}")
         zipbytes = check[-1].content
