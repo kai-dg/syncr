@@ -68,23 +68,6 @@ class Syncr(DbxManager):
                 print(f"{s.PREFIX} ERROR => {str(e)}")
                 return print(f"{s.PREFIX} {args[0]} needs an argument")
 
-    def ignorer(self):
-        # Glob for files - glob.glob(path/w wildcard)
-        # single file - compare without specila chars
-        ignore = db.read(s.IGNOREPATH, "text").split()
-        res = {}
-        addkeys = list(self.compare)
-        for i in ignore:
-            f = i[1:] if i[0] == os.sep else i
-            f = f[:-1] if f[-1] == os.sep else f
-            f = f.split(os.sep)
-            check = [s for s in addkeys if f[0] in s]
-            if check != []:
-                for c in check:
-                    self.compare.pop(c, None)
-                    self.addmessage.remove(f"{s.PREFIX} {s.GREEN}{c}{s.END} " +
-                    "is queued to push")
-
     def init(self, args):
         self.dm = self.dm(read_token())
         if len(args) < 1:
@@ -122,6 +105,24 @@ class Syncr(DbxManager):
             return print(f"{s.PREFIX} Finished pushing")
         else:
             return print(f"{s.PREFIX} Nothing is queued to push")
+
+    def ignorer(self):
+        # TODO Add regex for strict membership test
+        ignore = db.read(s.IGNOREPATH, "text").split()
+        res = {}
+        addkeys = list(self.compare)
+        for i in ignore:
+            f = i[1:] if i[0] == os.sep else i
+            f = f[:-1] if f[-1] == os.sep else f
+            f = f.split(os.sep)
+            check = [s for s in addkeys if f[0] in s]
+            if len(f) == 1:
+                check = f
+            if check != []:
+                for c in check:
+                    self.compare.pop(c, None)
+                    self.addmessage.remove(f"{s.PREFIX} {s.GREEN}{c}{s.END} " +
+                    "is queued to push")
 
     def add_single(self, f):
         fpath = os.path.join(s.CWDPATH, f)
