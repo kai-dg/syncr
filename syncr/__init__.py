@@ -32,22 +32,21 @@ def read_token():
 
 class Syncr(DbxManager):
     def __init__(self, args):
+        self.addmessage = []
         self.dbxpath = db.read(s.DBXPATH)
         self.syncadd = db.read(s.ADDPATH)
         self.compare = copy.deepcopy(self.syncadd)
-        self.ignore = self.ignorer()
         self.dm = DbxManager
         self.commands = {
+            "dbxlist": self.dm(read_token()).status,
             "init": self.init,
             "add": self.add,
             "rm": self.remove,
             "dbxcreate": self.dm(read_token()).create,
-            "dbxlist": self.dm(read_token()).status,
             "dbxdelete": self.dm(read_token()).delete
         }
         self.single_commands = {
             "dbxlist": self.dm(read_token()).status,
-            "ignore": self.ignorer,
             "push": self.push,
             "pull": self.pull,
             "status": self.status
@@ -73,13 +72,18 @@ class Syncr(DbxManager):
         # Glob for files - glob.glob(path/w wildcard)
         # single file - compare without specila chars
         ignore = db.read(s.IGNOREPATH, "text").split()
-        res = []
+        res = {}
+        addkeys = list(self.compare)
         for i in ignore:
             f = i[1:] if i[0] == os.sep else i
-            f = f.replace("*", "") if "*" in set(f) else f
             f = f[:-1] if f[-1] == os.sep else f
-            res.append(f)
-        return res
+            f = f.split(os.sep)
+            check = [s for s in addkeys if f[0] in s]
+            if check != []:
+                for c in check:
+                    self.compare.pop(c, None)
+                    self.addmessage.remove(f"{s.PREFIX} {s.GREEN}{c}{s.END} " +
+                    "is queued to push")
 
     def init(self, args):
         self.dm = self.dm(read_token())
@@ -122,19 +126,18 @@ class Syncr(DbxManager):
     def add_single(self, f):
         fpath = os.path.join(s.CWDPATH, f)
         f = f[:-1] if f[-1] == os.sep else f
-        if os.path.exists(fpath):
-            self.compare[f] = {} if not self.compare.get(f, None) \
-                              else self.compare[f]
-            mod = getmtime(fpath)
-            size = os.path.getsize(fpath)
-            # Need better modification detection
-            # TODO USE SELF.IGNORE LIST HERE TO PASS A PUSH TO QUEUE
-            if self.compare[f].get("size", None) != size:
-                self.compare[f]["mod"] = mod
-                self.compare[f]["pushed"] = False
-                print(f"{s.PREFIX} {s.GREEN}{f}{s.END}" +
-                       " is queued to push")
-            self.compare[f]["size"] = size
+        if not os.path.exists(fpath):
+            return False
+        mod = getmtime(fpath)
+        size = os.path.getsize(fpath)
+        self.compare[f] = {} if not self.compare.get(f, None) \
+                          else self.compare[f]
+        if self.compare[f].get("size", None) != size:
+            self.compare[f]["mod"] = mod
+            self.compare[f]["pushed"] = False
+            self.addmessage.append(f"{s.PREFIX} {s.GREEN}{f}{s.END} " +
+                                   "is queued to push")
+        self.compare[f]["size"] = size
     
     def add_all(self):
         for root, dirs, files in os.walk(s.CWDPATH, topdown=False):
@@ -157,8 +160,11 @@ class Syncr(DbxManager):
         else:
             for f in files:
                 self.add_single(f)
+        self.ignorer()
         if self.compare != self.syncadd:
             db.write(s.ADDPATH, self.compare)
+            message = "\n".join(self.addmessage)
+            print(f"{message}")
         else:
             print(f"{s.PREFIX} No changes detected at all")
 
