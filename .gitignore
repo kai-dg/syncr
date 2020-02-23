@@ -2,4 +2,4 @@ venv/*
 */__pycache__/*
 .syncr/*
 *.swp
-syncr/.synctoken
+syncr/.syncrtoken
