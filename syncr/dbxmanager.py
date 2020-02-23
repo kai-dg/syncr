@@ -39,9 +39,9 @@ class DbxManager:
 
     def check_for_folder(self, folder):
         try:
-            for entry in self.dbx.files_list_folder("").entries:
-                if "Folder" in str(entry.__class__):
-                    if folder.replace("/", "") == entry.name:
+            for entry in self.dbx.files_list_folder("", recursive=True).entries:
+                if entry.__class__.__name__ == "FolderMetadata":
+                    if folder == entry.path_lower:
                         return True
             return False
         except Exception as e:
