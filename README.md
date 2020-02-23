@@ -42,5 +42,21 @@ PASTE TOKEN FROM STEP 3 HERE AND ENTER
 - `*` means optional
 
 ---
+## Syncrignore
+
+You can add `.syncrignore` into the root of a directory with the init in it, to ignore all files with matching names to it.
+
+*Example*
+```
+> ~/test$ ls
+hello.txt foo.py
+> ~/test$ cat .syncrignore
+foo.py
+> ~/test$ syncr add .
+> Syncr: hello.txt is queued to push
+> ~/test$
+```
+
+---
 ## Author
 **Derrick Gee** - [kai-dg](https://github.com/kai-dg)
