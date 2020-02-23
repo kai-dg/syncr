@@ -29,6 +29,14 @@ class DbxManager:
     def __init__(self, token):
         self.dbx = dropbox.Dropbox(token)
 
+    def status(self, folder=""):
+        if folder != "":
+            folder = "/" + folder[0] if folder[0][0] != "/" else folder[0]
+        print(f"{s.PREFIX} Listing all folders in {s.GREEN}{folder}{s.END}:")
+        for entry in self.dbx.files_list_folder(folder).entries:
+            if entry.__class__.__name__ == "FolderMetadata":
+                print(f"  > {s.BLUE}{entry.name}{s.END}")
+
     def check_for_folder(self, folder):
         try:
             for entry in self.dbx.files_list_folder("").entries:

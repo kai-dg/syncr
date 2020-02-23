@@ -1,6 +1,6 @@
 # Syncr
 
-Dropbox API Wrapper terminal tool. Helps sync your code if you work on 2 or more computers, works like `git`.
+Dropbox SDK Wrapper terminal tool. Helps sync your code if you work on 2 or more computers, works like `git`.
 
 ---
 ## Getting your Dropbox Access Token
@@ -28,6 +28,8 @@ PASTE TOKEN FROM STEP 3 HERE AND ENTER
   - Creates a folder in your dropbox's root directory
 * `syncr dbxdelete DROPBOX_FOLDER_NAME`
   - Deletes a folder in your dropbox's root directory
+* `syncr dbxlist *FOLDER_NAME`
+  - Lists all folders in your dropbox
 * `syncr init DROPBOX_FOLDER_NAME`
   - Inits the current folder with the folder in your dropbox
 * `syncr add FILENAME*`
@@ -36,6 +38,8 @@ PASTE TOKEN FROM STEP 3 HERE AND ENTER
   - Pushes the added files to dropbox
 * `syncr pull`
   - Downloads all files from the set dropbox folder
+
+- `*` means optional
 
 ---
 ## Author

@@ -42,9 +42,11 @@ class Syncr(DbxManager):
             "add": self.add,
             "rm": self.remove,
             "dbxcreate": self.dm(read_token()).create,
+            "dbxlist": self.dm(read_token()).status,
             "dbxdelete": self.dm(read_token()).delete
         }
         self.single_commands = {
+            "dbxlist": self.dm(read_token()).status,
             "ignore": self.ignorer,
             "push": self.push,
             "pull": self.pull,
@@ -58,13 +60,14 @@ class Syncr(DbxManager):
         if args[0] not in list(self.commands) and args[0] \
                    not in list(self.single_commands):
             return print(f"{s.PREFIX} {args[0]} is not a command")
-        try:
+        if len(args) < 2:
             self.single_commands[args[0]]()
-        except Exception as e:
-            if len(args) < 2:
+        else:
+            try:
+                self.commands[args[0]](args[1:])
+            except Exception as e:
                 print(f"{s.PREFIX} ERROR => {str(e)}")
                 return print(f"{s.PREFIX} {args[0]} needs an argument")
-            self.commands[args[0]](args[1:])
 
     def ignorer(self):
         # Glob for files - glob.glob(path/w wildcard)
