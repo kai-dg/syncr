@@ -55,7 +55,7 @@ class Syncr(DbxManager):
 
     def run_args(self, args):
         if len(args) == 0:
-            return print("{s.PREFIX} give me a command")
+            return print(f"{s.PREFIX} give me a command")
         if args[0] not in list(self.commands) and args[0] \
                    not in list(self.single_commands):
             return print(f"{s.PREFIX} {args[0]} is not a command")

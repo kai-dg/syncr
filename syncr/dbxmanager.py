@@ -4,6 +4,7 @@ import json
 import dropbox
 import zipfile
 import shutil
+from uuid import uuid4
 from . import settings as s
 OVERWRITE = dropbox.files.WriteMode.overwrite
 
@@ -15,13 +16,15 @@ def unzipper(data, dest):
     with zipfile.ZipFile(zipf, 'r') as z:
         files = [f.filename for f in z.filelist]
         # Safe extract with dest
+        temp = os.path.join(dest, str(uuid4()))
+        os.mkdir(temp)
         for f in files[1:]:
-            z.extract(f, dest)
-        src = os.path.join(dest, files[0].replace("/", ""))
+            z.extract(f, temp)
+        src = os.path.join(temp, dest.split(os.sep)[-1])
         files = os.listdir(src)
         for f in files:
-            shutil.move(os.path.join(src, f), dest)
-    os.rmdir(src)
+            shutil.copy(os.path.join(src, f), dest)
+    shutil.rmtree(temp)
     os.remove(zipf)
     return True
 
