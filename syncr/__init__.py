@@ -9,10 +9,18 @@ from . import settings as s
 from . import database as db
 
 
-def read_token():
+def read_token(dbxacc):
+    if not dbxacc:
+        return None
     try:
         with open(s.TOKENPATH, "r") as f:
-            tokens = f.read().split()
+            tokenstr = [l.strip() for l in f.readlines()]
+            for t in tokenstr:
+                t = t.split()
+                tokens = (t[1], t[2]) if t[0] == dbxacc else None
+            if not tokens:
+                return print(f"{s.PREFIX} {dbxacc} doesn't have a token, " +
+                             "use dbxaddtoken")
             try:
                 f = Fernet(str.encode(tokens[0]))
                 return f.decrypt(str.encode(tokens[1])).decode()
@@ -20,33 +28,41 @@ def read_token():
                 print(f"{s.PREFIX} Credentials Error => {e.__class__}")
                 return print(e)
     except FileNotFoundError:
-        token = input(f"{s.PREFIX} What is your token?\n")
-        key = Fernet.generate_key()
-        f = Fernet(key)
-        enc = f.encrypt(str.encode(token.strip())).decode()
-        with open(s.TOKENPATH, "w") as f:
-            data = key.decode().strip() + " " + enc
-            f.write(data)
-            print(f"{s.PREFIX} Token has been saved")
+        return add_token()
+
+def add_token():
+    token = input(f"{s.PREFIX} What is your token?\n")
+    name = input(f"{s.PREFIX} Give a 1 word name for this dropbox account\n")
+    if len(name.split()) != 1:
+        print(f"{s.PREFIX} Are you incapable of reading instructions?")
+        quit()
+    key = Fernet.generate_key()
+    f = Fernet(key)
+    enc = f.encrypt(str.encode(token.strip())).decode()
+    with open(s.TOKENPATH, "w") as f:
+        data = name + " " + key.decode().strip() + " " + enc
+        f.write(data)
+        print(f"{s.PREFIX} Token for {name} has been saved")
         return token.strip()
 
 class Syncr(DbxManager):
     def __init__(self, args):
+        self.dm = DbxManager
         self.addmessage = []
-        self.dbxpath = db.read(s.DBXPATH)
+        self.dbxpath = db.read(s.DBXPATH) if db.read(s.DBXPATH) != {} else self.init(args[1:])
+        self.dbxacc = self.dbxpath.get("dbxacc", None)
         self.syncadd = db.read(s.ADDPATH)
         self.compare = copy.deepcopy(self.syncadd)
-        self.dm = DbxManager
         self.commands = {
-            "dbxlist": self.dm(read_token()).status,
+            "dbxlist": self.dm(read_token(self.dbxacc)).status,
             "init": self.init,
             "add": self.add,
             "rm": self.remove,
-            "dbxcreate": self.dm(read_token()).create,
-            "dbxdelete": self.dm(read_token()).delete
+            "dbxcreate": self.dm(read_token(self.dbxacc)).create,
+            "dbxdelete": self.dm(read_token(self.dbxacc)).delete
         }
         self.single_commands = {
-            "dbxlist": self.dm(read_token()).status,
+            "dbxlist": self.dm(read_token(self.dbxacc)).status,
             "push": self.push,
             "pull": self.pull,
             "status": self.status
@@ -55,7 +71,7 @@ class Syncr(DbxManager):
 
     def run_args(self, args):
         if len(args) == 0:
-            return print(f"{s.PREFIX} give me a command")
+            return print(f"{s.PREFIX} reading the readme can save you A LOT of time")
         if args[0] not in list(self.commands) and args[0] \
                    not in list(self.single_commands):
             return print(f"{s.PREFIX} {args[0]} is not a command")
@@ -69,30 +85,37 @@ class Syncr(DbxManager):
                 return print(f"{s.PREFIX} {args[0]} needs an argument")
 
     def init(self, args):
-        self.dm = self.dm(read_token())
-        if len(args) < 1:
-            return print(f"{s.PREFIX} Need to init a folder name from your dropbox")
-        folder = ("/" + args[0]) if args[0][0] != "/" else args[0]
+        if len(args) != 2:
+            print(f"{s.PREFIX} Need to init an account name and " +
+                  "folder name from your dropbox")
+            return {}
+
+        folder = ("/" + args[1]) if args[1][0] != "/" else args[1]
+        name = args[0]
+        if not os.path.exists(s.DBXPATH):
+            if not os.path.exists(s.DATAFOLDER):
+                os.mkdir(s.DATAFOLDER)
+            self.dbxacc = name
+            syncadd = {"folder": folder, "dbxacc": name}
+            db.write(s.DBXPATH, syncadd, writemode="w")
+            db.write(s.ADDPATH, {}, writemode="w")
+            print(f"{s.PREFIX} initialized dropbox folder {s.GREEN}{folder}" +
+                  f"{s.END} in dropbox account {s.BLUE}{name}{s.END}")
+        else:
+            print(f"{s.PREFIX} this folder already has an init")
+
+        self.dm = self.dm(read_token(self.dbxacc))
         folder_exists = self.dm.check_for_folder(folder)
         if not folder_exists:
             print(f"{s.PREFIX} Folder {s.GREEN}{folder}{s.END} could not" +
                   " be found dropbox")
             return print(f"{s.PREFIX} Create it with the dbxcreate command")
-        if not os.path.exists(s.DBXPATH):
-            if not os.path.exists(s.DATAFOLDER):
-                os.mkdir(s.DATAFOLDER)
-            syncadd = {"folder": folder}
-            db.write(s.DBXPATH, syncadd, writemode="w")
-            db.write(s.ADDPATH, {}, writemode="w")
-            print(f"{s.PREFIX} initialized dropbox folder {s.GREEN}{folder}" +
-                  f"{s.END}")
-        else:
-            print(f"{s.PREFIX} this folder already has an init")
+        quit()
 
     def push(self):
         print(f"{s.PREFIX} Reminder, currently can only push files under" +
               f" {s.RED}5MB{s.END}")
-        self.dm = self.dm(read_token())
+        self.dm = self.dm(read_token(self.dbxacc))
         folder = self.dbxpath["folder"]
         pushed = False
         for f in self.syncadd:
@@ -170,7 +193,7 @@ class Syncr(DbxManager):
             print(f"{s.PREFIX} No changes detected at all")
 
     def pull(self):
-        self.dm = self.dm(read_token())
+        self.dm = self.dm(read_token(self.dbxacc))
         folder = self.dbxpath["folder"]
         self.dm.download(folder, s.CWDPATH)
 

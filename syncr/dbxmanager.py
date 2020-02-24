@@ -30,7 +30,7 @@ def unzipper(data, dest):
 
 class DbxManager:
     def __init__(self, token):
-        self.dbx = dropbox.Dropbox(token)
+        self.dbx = dropbox.Dropbox(token) if token else quit()
 
     def status(self, folder=""):
         if folder != "":
