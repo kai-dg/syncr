@@ -41,14 +41,19 @@ class DbxManager:
                 print(f"  > {s.BLUE}{entry.name}{s.END}")
 
     def check_for_folder(self, folder):
+        check = False
         try:
             for entry in self.dbx.files_list_folder("", recursive=True).entries:
                 if entry.__class__.__name__ == "FolderMetadata":
                     if folder == entry.path_lower:
-                        return True
-            return False
+                        check = True
+            if not check:
+                print(f"{s.PREFIX} Folder {s.GREEN}{folder}{s.END} could not" +
+                      " be found in dropbox")
+                print(f"{s.PREFIX} Create it with the dbxcreate")
         except Exception as e:
-            return print(f"{s.PREFIX} ERROR => {str(e)}")
+            print(f"{s.PREFIX} ERROR => {str(e)}")
+        return check
 
     def create(self, args):
         if args == []:

@@ -89,27 +89,21 @@ class Syncr(DbxManager):
             print(f"{s.PREFIX} Need to init an account name and " +
                   "folder name from your dropbox")
             return {}
-
         folder = ("/" + args[1]) if args[1][0] != "/" else args[1]
         name = args[0]
-        if not os.path.exists(s.DBXPATH):
-            if not os.path.exists(s.DATAFOLDER):
-                os.mkdir(s.DATAFOLDER)
-            self.dbxacc = name
-            syncadd = {"folder": folder, "dbxacc": name}
-            db.write(s.DBXPATH, syncadd, writemode="w")
-            db.write(s.ADDPATH, {}, writemode="w")
-            print(f"{s.PREFIX} initialized dropbox folder {s.GREEN}{folder}" +
-                  f"{s.END} in dropbox account {s.BLUE}{name}{s.END}")
-        else:
-            print(f"{s.PREFIX} this folder already has an init")
-
-        self.dm = self.dm(read_token(self.dbxacc))
-        folder_exists = self.dm.check_for_folder(folder)
-        if not folder_exists:
-            print(f"{s.PREFIX} Folder {s.GREEN}{folder}{s.END} could not" +
-                  " be found dropbox")
-            return print(f"{s.PREFIX} Create it with the dbxcreate command")
+        self.dm = self.dm(read_token(name))
+        if self.dm.check_for_folder(folder):
+            if not os.path.exists(s.DBXPATH):
+                if not os.path.exists(s.DATAFOLDER):
+                    os.mkdir(s.DATAFOLDER)
+                self.dbxacc = name
+                syncadd = {"folder": folder, "dbxacc": name}
+                db.write(s.DBXPATH, syncadd, writemode="w")
+                db.write(s.ADDPATH, {}, writemode="w")
+                print(f"{s.PREFIX} initialized dropbox folder {s.GREEN}{folder}" +
+                      f"{s.END} in dropbox account {s.BLUE}{name}{s.END}")
+            else:
+                print(f"{s.PREFIX} this folder already has an init")
         quit()
 
     def push(self):
