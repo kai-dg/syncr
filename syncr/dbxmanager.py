@@ -51,9 +51,7 @@ class DbxManager:
 
     def status(self, args):
         folder, acc = self.check_args(args)
-        check = self.check_for_folder(folder)
-        if not check:
-            quit()
+        folder = "" if folder == "/" else folder
         print(f"{s.PREFIX} Account: {s.BLUE}{acc}{s.END}")
         print(f"{s.PREFIX} Listing all folders in {s.GREEN}{folder}{s.END}:")
         for entry in self.dbx.files_list_folder(folder).entries:
