@@ -1,68 +1,29 @@
 #!/usr/bin/env python3
 import os
 import copy
-import glob
-from cryptography.fernet import Fernet
 from os.path import getmtime
 from .dbxmanager import DbxManager
 from . import settings as s
 from . import database as db
 
 
-def read_token(dbxacc):
-    if not dbxacc:
-        return None
-    try:
-        with open(s.TOKENPATH, "r") as f:
-            tokenstr = [l.strip() for l in f.readlines()]
-            for t in tokenstr:
-                t = t.split()
-                tokens = (t[1], t[2]) if t[0] == dbxacc else None
-            if not tokens:
-                return print(f"{s.PREFIX} {dbxacc} doesn't have a token, " +
-                             "use dbxaddtoken")
-            try:
-                f = Fernet(str.encode(tokens[0]))
-                return f.decrypt(str.encode(tokens[1])).decode()
-            except Exception as e:
-                print(f"{s.PREFIX} Credentials Error => {e.__class__}")
-                return print(e)
-    except FileNotFoundError:
-        return add_token()
-
-def add_token():
-    token = input(f"{s.PREFIX} What is your token?\n")
-    name = input(f"{s.PREFIX} Give a 1 word name for this dropbox account\n")
-    if len(name.split()) != 1:
-        print(f"{s.PREFIX} Are you incapable of reading instructions?")
-        quit()
-    key = Fernet.generate_key()
-    f = Fernet(key)
-    enc = f.encrypt(str.encode(token.strip())).decode()
-    with open(s.TOKENPATH, "w") as f:
-        data = name + " " + key.decode().strip() + " " + enc
-        f.write(data)
-        print(f"{s.PREFIX} Token for {name} has been saved")
-        return token.strip()
-
 class Syncr(DbxManager):
     def __init__(self, args):
-        self.dm = DbxManager
+        self.dm = DbxManager()
         self.addmessage = []
-        self.dbxpath = db.read(s.DBXPATH) if db.read(s.DBXPATH) != {} else self.init(args[1:])
-        self.dbxacc = self.dbxpath.get("dbxacc", None)
+        self.dbxpath = db.read(s.DBXPATH)
         self.syncadd = db.read(s.ADDPATH)
         self.compare = copy.deepcopy(self.syncadd)
         self.commands = {
-            "dbxlist": self.dm(read_token(self.dbxacc)).status,
+            "dbxlist": self.dm.status,
             "init": self.init,
             "add": self.add,
             "rm": self.remove,
-            "dbxcreate": self.dm(read_token(self.dbxacc)).create,
-            "dbxdelete": self.dm(read_token(self.dbxacc)).delete
+            "dbxcreate": self.dm.create,
+            "dbxdelete": self.dm.delete
         }
         self.single_commands = {
-            "dbxlist": self.dm(read_token(self.dbxacc)).status,
+            "dbxaddtoken": db.add_token,
             "push": self.push,
             "pull": self.pull,
             "status": self.status
@@ -75,14 +36,13 @@ class Syncr(DbxManager):
         if args[0] not in list(self.commands) and args[0] \
                    not in list(self.single_commands):
             return print(f"{s.PREFIX} {args[0]} is not a command")
-        if len(args) < 2:
+        try:
             self.single_commands[args[0]]()
-        else:
-            try:
-                self.commands[args[0]](args[1:])
-            except Exception as e:
-                print(f"{s.PREFIX} ERROR => {str(e)}")
-                return print(f"{s.PREFIX} {args[0]} needs an argument")
+        except KeyError:
+            self.commands[args[0]](args[1:])
+        except Exception as e:
+            print(f"{s.PREFIX} {args[0]} needs an argument")
+            return print(f"{s.PREFIX} ERROR => {str(e)}")
 
     def init(self, args):
         if len(args) != 2:
@@ -90,18 +50,17 @@ class Syncr(DbxManager):
                   "folder name from your dropbox")
             return {}
         folder = ("/" + args[1]) if args[1][0] != "/" else args[1]
-        name = args[0]
-        self.dm = self.dm(read_token(name))
+        acc = args[0]
+        self.dm.dbx = self.dm.init_dbx(db.read_token(acc))
         if self.dm.check_for_folder(folder):
             if not os.path.exists(s.DBXPATH):
                 if not os.path.exists(s.DATAFOLDER):
                     os.mkdir(s.DATAFOLDER)
-                self.dbxacc = name
-                syncadd = {"folder": folder, "dbxacc": name}
+                syncadd = {"folder": folder, "dbxacc": acc}
                 db.write(s.DBXPATH, syncadd, writemode="w")
                 db.write(s.ADDPATH, {}, writemode="w")
                 print(f"{s.PREFIX} initialized dropbox folder {s.GREEN}{folder}" +
-                      f"{s.END} in dropbox account {s.BLUE}{name}{s.END}")
+                      f"{s.END} in dropbox account {s.BLUE}{acc}{s.END}")
             else:
                 print(f"{s.PREFIX} this folder already has an init")
         quit()
@@ -109,8 +68,9 @@ class Syncr(DbxManager):
     def push(self):
         print(f"{s.PREFIX} Reminder, currently can only push files under" +
               f" {s.RED}5MB{s.END}")
-        self.dm = self.dm(read_token(self.dbxacc))
         folder = self.dbxpath["folder"]
+        acc = self.dbxpath["dbxacc"]
+        self.dm.dbx = self.dm.init_dbx(db.read_token(acc))
         pushed = False
         for f in self.syncadd:
             if self.syncadd[f]["pushed"] == False:
@@ -187,15 +147,19 @@ class Syncr(DbxManager):
             print(f"{s.PREFIX} No changes detected at all")
 
     def pull(self):
-        self.dm = self.dm(read_token(self.dbxacc))
         folder = self.dbxpath["folder"]
+        acc = self.dbxpath["dbxacc"]
+        self.dm.dbx = self.dm.init_dbx(db.read_token(acc))
         self.dm.download(folder, s.CWDPATH)
 
     def remove(self, files):
         pass
 
     def status(self):
-        print(f"{s.PREFIX} STATUS {s.GREEN}{s.CWDPATH}{s.END}:")
+        cwd = db.read(s.DBXPATH)
+        name, path = cwd["dbxacc"], cwd["folder"]
+        print(f"{s.PREFIX} Account {s.BLUE}{name}{s.END}{s.GREEN}{path}" +
+              f"{s.END} STATUS:")
         notpushed = []
         for f in self.syncadd:
             if not self.syncadd[f]["pushed"]:
