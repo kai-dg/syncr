@@ -133,6 +133,8 @@ class Syncr(DbxManager):
         """files (list): List of args"""
         if self.dbxpath == {}:
             return print(f"{s.PREFIX} Run syncr init to initialize this folder")
+        if len(files) == 0:
+            return print(f"{s.PREFIX} Add a file or . for all")
         if files[0] == ".":
             self.add_all()
         else:
