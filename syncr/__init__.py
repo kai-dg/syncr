@@ -156,8 +156,9 @@ class Syncr(DbxManager):
         pass
 
     def status(self):
-        cwd = db.read(s.DBXPATH)
-        name, path = cwd["dbxacc"], cwd["folder"]
+        if self.dbxpath == {}:
+            return print(f"{s.PREFIX} Run syncr init to initialize this folder")
+        name, path = self.dbxpath["dbxacc"], self.dbxpath["folder"]
         print(f"{s.PREFIX} Account {s.BLUE}{name}{s.END}{s.GREEN}{path}" +
               f"{s.END} STATUS:")
         notpushed = []
