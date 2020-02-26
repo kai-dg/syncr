@@ -24,13 +24,15 @@ PASTE TOKEN FROM STEP 3 HERE AND ENTER
 ---
 ## Commands
 
-* `syncr dbxcreate DROPBOX_FOLDER_NAME`
+* `syncr dbxcreate ACC_NAME DROPBOX_FOLDER_NAME`
   - Creates a folder in your dropbox's root directory
-* `syncr dbxdelete DROPBOX_FOLDER_NAME`
+* `syncr dbxdelete ACC_NAME DROPBOX_FOLDER_NAME`
   - Deletes a folder in your dropbox's root directory
-* `syncr dbxlist *FOLDER_NAME`
+* `syncr dbxlist ACC_NAME *FOLDER_NAME`
   - Lists all folders in your dropbox
-* `syncr init DROPBOX_FOLDER_NAME`
+* `syncr dbxaddtoken`
+  - Adds a dropbox account token with a name associated to it
+* `syncr init ACC_NAME DROPBOX_FOLDER_NAME`
   - Inits the current folder with the folder in your dropbox
 * `syncr add FILENAME*`
   - Adds file(s) to the queue to push
@@ -38,6 +40,8 @@ PASTE TOKEN FROM STEP 3 HERE AND ENTER
   - Pushes the added files to dropbox
 * `syncr pull`
   - Downloads all files from the set dropbox folder
+* `syncr status`
+  - Shows what is not pushed yet in a folder with init
 
 - `*` means optional
 
