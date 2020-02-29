@@ -80,7 +80,7 @@ class Syncr(DbxManager):
         pushed = False
         for f in self.syncadd:
             if self.syncadd[f]["pushed"] == False:
-                self.dm.upload(folder, f)
+                self.dm.upload(folder, self.syncadd[f]["dbxpath"])
                 self.syncadd[f]["pushed"] = True
                 pushed = True
         db.write(s.ADDPATH, self.syncadd)
@@ -108,7 +108,7 @@ class Syncr(DbxManager):
         self.compare[f] = {} if not self.compare.get(f, None) \
                           else self.compare[f]
         if self.compare[f].get("size", None) != size:
-            self.compare[f]["display"] = display
+            self.compare[f]["dbxpath"] = display
             self.compare[f]["mod"] = mod
             self.compare[f]["pushed"] = False
             self.addmessage.append(f"{s.PREFIX} {s.GREEN}{display}{s.END} " +
