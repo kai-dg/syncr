@@ -7,8 +7,14 @@ from . import settings as s
 from . import database as db
 
 
+def absoluteFilePaths(directory):
+   for dirpath,_,filenames in os.walk(directory):
+       for f in filenames:
+           print(os.path.abspath(os.path.join(dirpath, f)))
+
 class Syncr(DbxManager):
     def __init__(self, args):
+        self.ignore = self.make_ignore()
         self.dm = DbxManager()
         self.addmessage = []
         self.dbxpath = db.read(s.DBXPATH)
@@ -83,51 +89,40 @@ class Syncr(DbxManager):
         else:
             return print(f"{s.PREFIX} Nothing is queued to push")
 
-    def ignorer(self):
-        # TODO Add regex for strict membership test
+    def make_ignore(self):
         ignore = db.read(s.IGNOREPATH, "text").split()
-        res = {}
-        addkeys = list(self.compare)
-        for i in ignore:
-            f = i[1:] if i[0] == os.sep else i
-            f = f[:-1] if f[-1] == os.sep else f
-            f = f.split(os.sep)
-            check = [s for s in addkeys if f[0] in s]
-            if len(f) == 1:
-                check = f
-            if check != []:
-                for c in check:
-                    self.compare.pop(c, None)
-                    self.addmessage.remove(f"{s.PREFIX} {s.GREEN}{c}{s.END} " +
-                    "is queued to push")
+        if ignore != "":
+            for idx in range(len(ignore)):
+                ignore[idx] = os.path.join(s.CWDPATH, ignore[idx])
+            return ignore
+        return None
 
-    def add_single(self, f):
-        fpath = os.path.join(s.CWDPATH, f)
-        f = f[:-1] if f[-1] == os.sep else f
-        if not os.path.exists(fpath):
+    def add_single(self, f, display):
+        if f == "":
             return False
-        mod = getmtime(fpath)
-        size = os.path.getsize(fpath)
+        f = f[:-1] if f[-1] == os.sep else f
+        if not os.path.exists(f):
+            return False
+        mod = getmtime(f)
+        size = os.path.getsize(f)
         self.compare[f] = {} if not self.compare.get(f, None) \
                           else self.compare[f]
         if self.compare[f].get("size", None) != size:
+            self.compare[f]["display"] = display
             self.compare[f]["mod"] = mod
             self.compare[f]["pushed"] = False
-            self.addmessage.append(f"{s.PREFIX} {s.GREEN}{f}{s.END} " +
+            self.addmessage.append(f"{s.PREFIX} {s.GREEN}{display}{s.END} " +
                                    "is queued to push")
         self.compare[f]["size"] = size
     
     def add_all(self):
-        for root, dirs, files in os.walk(s.CWDPATH, topdown=False):
+        for root, _, files in os.walk(s.CWDPATH, topdown=False):
             for f in files:
-                path = os.path.join(s.CWDPATH, root, f)
-                if "syncr" not in path:
-                    subdirs = root.replace(s.CWDPATH, "")
-                    if subdirs != "":
-                        subdirs = subdirs[1:] if subdirs[0] == "/" else subdirs
-                        self.add_single(os.path.join(subdirs, f))
-                    else:
-                        self.add_single(f)
+                fpath = os.path.abspath(os.path.join(root, f))
+                display = fpath.replace(s.CWDPATH, "")[1:]
+                for i in self.ignore:
+                    fpath = fpath if i not in fpath else ""
+                self.add_single(fpath, display)
 
     def add(self, files):
         """files (list): List of args"""
@@ -139,8 +134,10 @@ class Syncr(DbxManager):
             self.add_all()
         else:
             for f in files:
-                self.add_single(f)
-        self.ignorer()
+                fpath = os.path.join(s.CWDPATH, f)
+                for i in self.ignore:
+                    fpath = fpath if i not in fpath else ""
+                self.add_single(fpath, f)
         if self.compare != self.syncadd:
             db.write(s.ADDPATH, self.compare)
             message = "\n".join(self.addmessage)

@@ -3,3 +3,4 @@ venv/*
 .syncr/*
 *.swp
 syncr/.syncrtoken.json
+.syncrignore
